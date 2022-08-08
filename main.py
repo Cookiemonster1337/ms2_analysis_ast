@@ -3,8 +3,9 @@ from plotly.offline import plot
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
+import numpy as np
 
-folder = r'W:\Projekte\MAXCoat_61906\04_Bearbeitung\in-situ PEMFC\MS2\S316LwCoating'
+folder = r'W:\Projekte\MAXCoat_61906\04_Bearbeitung\in-situ PEMFC\MS2\S316LwCoating\testrig'
 
 files = ['maxcoat_ss_coating_#01_20220729.txt',
          'maxcoat_ss_coating_#01_20220730.txt',
@@ -13,7 +14,10 @@ files = ['maxcoat_ss_coating_#01_20220729.txt',
          'maxcoat_ss_coating_#01_20220802.txt',
          'maxcoat_ss_coating_#01_20220803.txt',
          'maxcoat_ss_coating_#01_20220804.txt',
-         'maxcoat_ss_coating_#01_20220805.txt']
+         'maxcoat_ss_coating_#01_20220805.txt',
+         'maxcoat_ss_coating_#01_20220806.txt',
+         'maxcoat_ss_coating_#01_20220807.txt',
+         'maxcoat_ss_coating_#01_20220808.txt']
 
 dfs = [pd.read_csv(folder + '/' + f, encoding='cp1252', delimiter='\t', decimal=',') for f in files]
 
@@ -43,6 +47,7 @@ starttime = df.index[0]
 
 # time = df['t elapsed [s]']
 timer = df.index
+df = df.reset_index()
 df['current density [A/cm2]'] = round(df['I Summe [A]'] / 25,2)
 
 # parameters fig1
@@ -50,6 +55,47 @@ voltage = df['AI.U.E.Co.Tb.1 [V]']
 temperature = df['AI.T.Air.ST.UUT.out [°C]']
 hfr = df['HFR [mOhm]'].apply(lambda x: x if x != -99 and x < 100 else None)
 current_density = df['current density [A/cm2]']
+
+#get iv-curves
+iv_markers = df.index[df['Kommentar'] == '#IV-CURVE#'].tolist()
+
+eis_markers = df.index[df['Kommentar'] == '#EIS#'].tolist()
+cv_markers = df.index[df['Kommentar'] == '#CV#'].tolist()
+
+
+#fig2
+fig_pol = make_subplots()
+
+
+for i in range(0, len(iv_markers)):
+
+    if i == len(iv_markers) - 1:
+        df_iv = df.iloc[iv_markers[i]:]
+    else:
+        df_iv = df.iloc[iv_markers[i]: iv_markers[i + 1]]
+
+    df_iv = df_iv[df_iv['Kommentar'] == 'ui1_messen']
+
+    current_densities = pd.unique(df_iv['current density [A/cm2]'])
+    #
+    # for i in range(0, len(iv_df)):
+    #     if df['Kommentar'][i] == 'u1_messen':
+    #         pol_date = df.index[i]
+
+    mean_voltages = []
+
+    for j in current_densities:
+        mean_voltages.append(
+            df_iv[df_iv['current density [A/cm2]'] == j]['AI.U.E.Co.Tb.1 [V]'].mean())
+
+
+
+    iv_name = '#' + str(i+1) + ' @ ' + df['Datum / Uhrzeit'][iv_markers[i]]
+
+    fig_pol.add_trace(
+        go.Scatter(x=current_densities, y=mean_voltages, name=iv_name)
+    )
+
 
 # parameters fig2
 df2 = df[df['Kommentar'] == 'ui1_messen']
@@ -64,7 +110,6 @@ mean_voltages = []
 for j in current_densities:
     mean_voltages.append(
         df2[df2['current density [A/cm2]'] == j]['AI.U.E.Co.Tb.1 [V]'].mean())
-
 
 
 #fig1
@@ -93,13 +138,16 @@ fig_main.add_trace(
 fig_main.update_layout(width=1200, height=600)
 
 
-#fig2
-fig_pol = make_subplots(specs=[[{"secondary_y": True}]])
 
-fig_pol.add_trace(
-    go.Scatter(x=current_densities, y=mean_voltages, name="mean_voltage [V]"),
-    secondary_y=False,
-)
+
+#fig2
+# fig_pol = make_subplots(specs=[[{"secondary_y": True}]])
+#
+# fig_pol.add_trace(
+#     go.Scatter(x=current_densities, y=mean_voltages, name="mean_voltage [V]"),
+#     secondary_y=False,
+# )
+
 
 # fig_main.add_trace(
 #     go.Scatter(x=timer, y=voltage, name="voltage [V]"),
